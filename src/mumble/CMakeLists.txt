@@ -401,6 +401,16 @@ target_include_directories(mumble PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(mumble PRIVATE mumble_client_object_lib shared spdlog::spdlog)
 target_link_libraries(mumble PRIVATE CLI11::CLI11)
 
+# See the analogous comment in src/CMakeLists.txt: force the bundled spdlog/CLI11 headers
+# to take precedence over any vcpkg-provided copies that might otherwise shadow them and
+# cause an ABI mismatch against the bundled libraries linked above.
+if(bundled-spdlog)
+	target_include_directories(mumble SYSTEM BEFORE PRIVATE "${3RDPARTY_DIR}/spdlog/include")
+endif()
+if(bundled-cli11)
+	target_include_directories(mumble SYSTEM BEFORE PRIVATE "${3RDPARTY_DIR}/CLI11/include")
+endif()
+
 target_compile_definitions(mumble_client_object_lib
 	PUBLIC
 	"MUMBLE_LIBRARY_PATH=${MUMBLE_INSTALL_ABS_LIBDIR}"
@@ -818,26 +828,7 @@ else()
 endif()
 
 if(webrtc-audio-processing)
-	find_pkg(webrtc-audio-processing QUIET)
-
-	if(webrtc-audio-processing_FOUND)
-		set(webrtc_target webrtc-audio-processing)
-	else()
-		find_pkg(webrtc-audio-processing-1 QUIET)
-
-		if(webrtc-audio-processing-1_FOUND)
-			set(webrtc_target webrtc-audio-processing-1)
-		else()
-			find_pkg(webrtc QUIET)
-
-			if(webrtc_FOUND)
-				set(webrtc_target webrtc)
-			else()
-				find_pkg(unofficial-webrtc REQUIRED)
-				set(webrtc_target unofficial-webrtc)
-			endif()
-		endif()
-	endif()
+	find_pkg(unofficial-webrtc REQUIRED)
 
 	target_compile_definitions(
 		mumble_client_object_lib
@@ -845,24 +836,11 @@ if(webrtc-audio-processing)
 			USE_WEBRTC_AUDIO_PROCESSING
 	)
 
-	if(webrtc_target STREQUAL "unofficial-webrtc")
-		target_link_libraries(
-			mumble_client_object_lib
-			PUBLIC
-				unofficial::webrtc::webrtc
-		)
-	else()
-		target_include_directories(
-			mumble_client_object_lib
-			PUBLIC
-				${${webrtc_target}_INCLUDE_DIRS}
-		)
-		target_link_libraries(
-			mumble_client_object_lib
-			PUBLIC
-				${${webrtc_target}_LIBRARIES}
-		)
-	endif()
+	target_link_libraries(
+		mumble_client_object_lib
+		PUBLIC
+			unofficial::webrtc::webrtc
+	)
 endif()
 
 if(crash-report)
